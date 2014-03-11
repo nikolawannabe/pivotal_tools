@@ -141,7 +141,7 @@ def get_stories(project, arguments):
         number_of_stories = int(arguments['--number'])
     else:
         print
-        print "Showing the top 20 stories, if you want to show more, specify number with the --number option"
+        print "No story count specified.  Default to max 20. Get more with --number=NN"
         print
     return stories, number_of_stories
 
