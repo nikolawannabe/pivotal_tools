@@ -39,6 +39,7 @@ Usage:
   pivotal_tools create (feature|bug|chore) <title> [<description>] [--project-index=<pi>]
   pivotal_tools (start|finish|deliver|accept|reject) story <story_id> [--project-index=<pi>]
   pivotal_tools show stories [--project-index=<pi>] [--for=<user_name>] [--number=<number_of_stories>]
+  pivotal_tools show todo [--project-index=<pi>] [--for=<user_name>] [--number=<number_of_stories>] [--points=<points>]
   pivotal_tools show story <story_id> [--project-index=<pi>]
   pivotal_tools open <story_id> [--project-index=<pi>]
   pivotal_tools changelog [--project-index=<pi>]
@@ -128,13 +129,7 @@ def generate_changelog(project):
 
     print
 
-
-def show_stories(project, arguments):
-    """Shows the top stories
-    By default it will show the top 20.  But that change be changed by the --number arguement
-    You can further filter the list by passing the --for argument and pass the initials of the user
-    """
-
+def get_stories(project, arguments):
     search_string = 'state:unscheduled,unstarted,rejected,started'
     if arguments['--for'] is not None:
         search_string += " owner:{}".format(arguments['--for'])
@@ -148,8 +143,14 @@ def show_stories(project, arguments):
         print
         print "Showing the top 20 stories, if you want to show more, specify number with the --number option"
         print
+    return stories, number_of_stories
 
-
+def show_stories(project, arguments):
+    """Shows the top stories
+    By default it will show the top 20.  But that change be changed by the --number arguement
+    You can further filter the list by passing the --for argument and pass the initials of the user
+    """
+    stories, number_of_stories = get_stories(project, arguments)
     if len(stories) == 0:
         print "None"
     else:
@@ -162,6 +163,31 @@ def show_stories(project, arguments):
                                                            story.name)
 
 
+def show_todo(project, arguments):
+    """Shows the stories that that can reasonably be worked on in the point limit from the top 20
+     or specified number of stories.  If --points is not specified, grabs up to 10K points worth of
+    stories.
+    """
+    stories, number_of_stories = get_stories(project, arguments)
+    if arguments['--points'] is not None:
+        points = int(arguments['--points'])
+    else:
+        points = 10000
+
+    if len(stories) == 0:
+        print "None"
+    else:
+        partialPoints = 0
+        for story in islice(stories, number_of_stories):
+            if partialPoints > points:
+                break
+            if story.estimate:
+                partialPoints = partialPoints + story.estimate
+            print '{:10s}[{}] {}'.format('#{}'.format(story.story_id),
+                                         story.estimate,
+                                         story.name)
+
+
 def show_story(story_id, arguments):
     """Shows the Details for a single story
 
@@ -170,7 +196,6 @@ def show_story(story_id, arguments):
 
     story = load_story(story_id, arguments)
 
-
     print
     print colored('{:12s}{:4s}{:9s}{:10s} {}'.format('#{}'.format(story.story_id),
                                                      initials(story.owned_by),
@@ -178,7 +203,8 @@ def show_story(story_id, arguments):
                                                      estimate_visual(story.estimate),
                                                      story.name), 'white', attrs=['bold'])
     print
-    print colored("Story Url: ", 'white', attrs=['bold']) + colored(story.url, 'blue', attrs=['underline'])
+    print colored("Story Url: ", 'white', attrs=['bold']) + colored(story.url, 'blue',
+                                                                    attrs=['underline'])
     print colored("Description: ", 'white', attrs=['bold']) + story.description
 
     if len(story.notes) > 0:
@@ -186,7 +212,6 @@ def show_story(story_id, arguments):
         print bold("Notes:")
         for note in story.notes:
             print "[{}] {}".format(initials(note.author), note.text)
-
 
     if len(story.tasks) > 0:
         print
@@ -198,7 +223,8 @@ def show_story(story_id, arguments):
         print
         print bold("Attachments:")
         for attachment in story.attachments:
-            print "{} {}".format(attachment.description, colored(attachment.url,'blue',attrs=['underline']))
+            print "{} {}".format(attachment.description,
+                                 colored(attachment.url, 'blue', attrs=['underline']))
 
     print
 
@@ -230,8 +256,8 @@ def scrum(project):
         print 'Not sure that I believe it, but there are no bugs'
     for bug in bugs:
         print "   #{:12s} {:4s} {}".format(bug.story_id,
-                                     initials(bug.owned_by),
-                                     bug.name)
+                                           initials(bug.owned_by),
+                                           bug.name)
 
 
 def poker(project):
@@ -244,7 +270,8 @@ def poker(project):
     for idx, story in enumerate(project.unestimated_stories()):
         clear()
         rows, cols = _get_column_dimensions()
-        print "{} PLANNING POKER SESSION [{}]".format(project.name.upper(), bold("{}/{} Stories Estimated".format(idx+1, total_stories)))
+        print "{} PLANNING POKER SESSION [{}]".format(project.name.upper(), bold(
+            "{}/{} Stories Estimated".format(idx + 1, total_stories)))
         print "-" * cols
         pretty_print_story(story)
         prompt_estimation(project, story)
@@ -270,8 +297,8 @@ def browser_open(story_id, arguments):
 
     webbrowser.open(story.url)
 
-def create_story(project, arguments):
 
+def create_story(project, arguments):
     story = dict()
     story['name'] = arguments['<title>']
     if '<description>' in arguments:
@@ -290,7 +317,6 @@ def create_story(project, arguments):
 
 
 def update_status(arguments):
-
     story = None
     if '<story_id>' in arguments:
         story_id = arguments['<story_id>']
@@ -321,7 +347,6 @@ def update_status(arguments):
         print "hmmm could not find story"
 
 
-
 ## Helper Methods
 
 
@@ -350,7 +375,7 @@ def prompt_project(arguments):
     while True:
         print "Select a Project:"
         for idx, project in enumerate(projects):
-            print "[{}] {}".format(idx+1, project.name)
+            print "[{}] {}".format(idx + 1, project.name)
         s = raw_input('>> ')
 
         try:
@@ -423,6 +448,7 @@ def group_stories_by_label(stories):
 
 def pretty_date():
     from datetime import datetime
+
     return datetime.now().strftime('%b %d, %Y')
 
 
@@ -453,7 +479,6 @@ def pretty_print_story(story):
                 print "Description: {}".format(attachment.description)
             print "Url: {}".format(colored(attachment.url, 'blue'))
 
-
     if len(story.tasks) > 0:
         print
         print bold("Tasks:")
@@ -476,7 +501,7 @@ def prompt_estimation(project, story):
     elif input_value in ['o', 'O']:
         webbrowser.open(story.url)
         prompt_estimation(project, story)
-    elif input_value in ['q','Q']:
+    elif input_value in ['q', 'Q']:
         exit()
     elif input_value in project.point_scale:
         value = int(input_value)
@@ -499,7 +524,6 @@ def x_or_space(complete):
 
 
 def main():
-
     arguments = docopt(__doc__)
 
     check_api_token()
@@ -510,6 +534,9 @@ def main():
     elif arguments['show'] and arguments['stories']:
         project = prompt_project(arguments)
         show_stories(project, arguments)
+    elif arguments['show'] and arguments['todo']:
+        project = prompt_project(arguments)
+        show_todo(project, arguments)
     elif arguments['show'] and arguments['story']:
         show_story(arguments['<story_id>'], arguments)
     elif arguments['open']:
