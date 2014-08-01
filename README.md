@@ -10,7 +10,9 @@ install
 -------
 
 ```bash
-pip install pivotal_tools
+git clone https://github.com/nikolawannabe/pivotal_tools/
+cd pivotal_tools
+python setup.py install
 ```
 
 
@@ -18,7 +20,7 @@ setup
 -----
 Add PIVOTAL_TOKEN to your environment
 
-I put mine in ~/.zshenv, like so ...
+I put mine in ~/.bash_aliases, like so ...
 
 `export PIVOTAL_TOKEN='your token'`
 
@@ -43,6 +45,10 @@ By default show the top 20 stories, can specify more (or less) with the _number_
 show story
 ---------------
 Show the details for a given story.  passing the project-index parameter will make it faster
+
+show todo
+---------------
+Shows your upcoming tasks.  You can specify a __points__ limit to restrict the stories shown to the number of points worth of stories you want to see.
 
 open
 ---------------
